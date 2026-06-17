@@ -1,0 +1,16 @@
+# macOS metadata
+.DS_Store
+
+# Environment configuration (contains passwords)
+.env
+
+# Database dumps
+data/dump.sql
+data/dump.sql.gz
+
+# WordPress uploads and content (may contain sensitive data)
+# Remove this line if you want to track wp-content in git
+data/wp-content/
+
+# Docker volumes (if created locally)
+mysql-data/
