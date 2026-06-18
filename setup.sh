@@ -182,9 +182,9 @@ EOF
 # Parse DB credentials from remote wp-config.php
 # Sets REMOTE_DB_NAME, REMOTE_DB_USER, REMOTE_DB_PASS globals
 parse_remote_wp_config() {
-    local server="$1" wp_path="$2"
+    local server="$1" wp_path="$2" port="${3:-22}"
     local wp_config
-    wp_config=$(ssh "$server" "cat '$wp_path/wp-config.php'" 2>/dev/null) || return 1
+    wp_config=$(ssh -p "$port" "$server" "cat '$wp_path/wp-config.php'" 2>/dev/null) || return 1
 
     # Extract values using awk (portable across macOS and Linux)
     extract_wp_define() {
@@ -423,7 +423,7 @@ setup_import() {
 
 setup_pull() {
     step "Server connection"
-    local server wp_path pull_mode
+    local server ssh_port wp_path pull_mode
 
     echo -ne "  ${BOLD}?${RESET} SSH connection (user@host): " >&2
     read -r server
@@ -432,14 +432,16 @@ setup_pull() {
         exit 1
     fi
 
+    ssh_port=$(ask "SSH port" "22")
+
     # Test SSH connection before proceeding
-    info "Testing SSH connection to ${BOLD}${server}${RESET}..."
-    if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "$server" "echo ok" &>/dev/null; then
-        fail "Cannot connect to ${server} via SSH."
+    info "Testing SSH connection to ${BOLD}${server}${RESET} (port ${ssh_port})..."
+    if ! ssh -p "$ssh_port" -o ConnectTimeout=10 -o BatchMode=yes "$server" "echo ok" &>/dev/null; then
+        fail "Cannot connect to ${server} via SSH (port ${ssh_port})."
         echo -e "  ${DIM}Check that:${RESET}"
         echo -e "  ${DIM}  - The host is reachable${RESET}"
         echo -e "  ${DIM}  - Your SSH key is configured (ssh-add -l)${RESET}"
-        echo -e "  ${DIM}  - The username is correct${RESET}"
+        echo -e "  ${DIM}  - The username and port are correct${RESET}"
         exit 1
     fi
     ok "SSH connection successful"
@@ -451,7 +453,7 @@ setup_pull() {
     local detected_paths=()
     local search_result
     # Check common locations first (fast), then fall back to find (slower)
-    search_result=$(ssh "$server" "
+    search_result=$(ssh -p "$ssh_port" "$server" "
         found=()
         # Common WordPress locations
         for dir in \
@@ -518,11 +520,11 @@ setup_pull() {
 
     # Verify the path exists and contains WordPress
     info "Verifying WordPress at ${BOLD}${wp_path}${RESET}..."
-    if ! ssh "$server" "test -d '$wp_path'" 2>/dev/null; then
+    if ! ssh -p "$ssh_port" "$server" "test -d '$wp_path'" 2>/dev/null; then
         fail "Directory ${wp_path} does not exist on ${server}."
         exit 1
     fi
-    if ! ssh "$server" "test -f '$wp_path/wp-config.php'" 2>/dev/null; then
+    if ! ssh -p "$ssh_port" "$server" "test -f '$wp_path/wp-config.php'" 2>/dev/null; then
         warn "wp-config.php not found in ${wp_path} — this may not be a WordPress root"
         if ! confirm "Continue anyway?" "n"; then
             exit 1
@@ -537,7 +539,7 @@ setup_pull() {
 
     if confirm "Read DB credentials from server's wp-config.php?" "y"; then
         info "Reading wp-config.php from server..."
-        if parse_remote_wp_config "$server" "$wp_path"; then
+        if parse_remote_wp_config "$server" "$wp_path" "$ssh_port"; then
             ok "Credentials detected from wp-config.php:"
             echo -e "    ${DIM}DB_NAME:     ${RESET}${REMOTE_DB_NAME}"
             echo -e "    ${DIM}DB_USER:     ${RESET}${REMOTE_DB_USER}"
@@ -573,14 +575,14 @@ setup_pull() {
     case "$pull_mode" in
         1)
             info "Pulling files from ${server}:${wp_path}/wp-content/..."
-            if ! make pull-files SERVER="$server" WP_PATH="$wp_path"; then
+            if ! make pull-files SERVER="$server" WP_PATH="$wp_path" SSH_PORT="$ssh_port"; then
                 fail "Failed to pull files from server. Check SSH access and path permissions."
                 exit 1
             fi
             ok "Files pulled successfully"
 
             info "Exporting database from ${server}..."
-            if ! make pull-db SERVER="$server" WP_PATH="$wp_path"; then
+            if ! make pull-db SERVER="$server" WP_PATH="$wp_path" SSH_PORT="$ssh_port"; then
                 fail "Failed to export database. Check that WP-CLI is installed on the server."
                 echo -e "  ${DIM}Alternative: export manually with mysqldump and place dump.sql in data/${RESET}"
                 exit 1
@@ -593,7 +595,7 @@ setup_pull() {
             ;;
         2)
             info "Pulling files from ${server}:${wp_path}/wp-content/..."
-            if ! make pull-files SERVER="$server" WP_PATH="$wp_path"; then
+            if ! make pull-files SERVER="$server" WP_PATH="$wp_path" SSH_PORT="$ssh_port"; then
                 fail "Failed to pull files from server. Check SSH access and path permissions."
                 exit 1
             fi
@@ -601,7 +603,7 @@ setup_pull() {
             ;;
         3)
             info "Exporting database from ${server}..."
-            if ! make pull-db SERVER="$server" WP_PATH="$wp_path"; then
+            if ! make pull-db SERVER="$server" WP_PATH="$wp_path" SSH_PORT="$ssh_port"; then
                 fail "Failed to export database. Check that WP-CLI is installed on the server."
                 echo -e "  ${DIM}Alternative: export manually with mysqldump and place dump.sql in data/${RESET}"
                 exit 1
@@ -621,7 +623,7 @@ setup_pull() {
         # Try auto-detecting the production URL
         info "Trying to auto-detect production URL..."
         local detected_url=""
-        detected_url=$(ssh "$server" "cd $wp_path && wp option get siteurl 2>/dev/null" 2>/dev/null || true)
+        detected_url=$(ssh -p "$ssh_port" "$server" "cd $wp_path && wp option get siteurl 2>/dev/null" 2>/dev/null || true)
 
         local old_url
         if [[ -n "$detected_url" ]]; then

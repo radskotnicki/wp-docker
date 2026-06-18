@@ -13,6 +13,7 @@ endif
 # Default values
 WP_PORT ?= 8080
 NEW ?= http://localhost:$(WP_PORT)
+SSH_PORT ?= 22
 
 .PHONY: help setup up down logs clean build import-db wp composer replace-urls pull pull-files pull-db
 
@@ -125,6 +126,7 @@ endif
 		echo "Syncing wp-content from $(SERVER):$(WP_PATH)/wp-content/ (rsync)..."; \
 		mkdir -p data/wp-content; \
 		rsync -avz --delete \
+			-e "ssh -p $(SSH_PORT)" \
 			--exclude='cache/' \
 			--exclude='w3tc-config/' \
 			--exclude='wp-rocket-config/' \
@@ -141,7 +143,7 @@ endif
 		echo "  macOS:  brew install rsync"; \
 		echo "  Ubuntu: sudo apt install rsync"; \
 		mkdir -p data/wp-content; \
-		scp -r $(SERVER):$(WP_PATH)/wp-content/ ./data/wp-content/; \
+		scp -P $(SSH_PORT) -r $(SERVER):$(WP_PATH)/wp-content/ ./data/wp-content/; \
 	fi
 	@echo "Files synced."
 
@@ -156,12 +158,12 @@ ifndef WP_PATH
 	$(error WP_PATH is required. Usage: make pull-db SERVER=user@host WP_PATH=/path/to/wp)
 endif
 	@echo "Exporting database from $(SERVER)..."
-	@if ssh $(SERVER) "command -v wp >/dev/null 2>&1 && cd $(WP_PATH) && wp db export - 2>/dev/null" > data/dump.sql 2>/dev/null && [ -s data/dump.sql ]; then \
+	@if ssh -p $(SSH_PORT) $(SERVER) "command -v wp >/dev/null 2>&1 && cd $(WP_PATH) && wp db export - 2>/dev/null" > data/dump.sql 2>/dev/null && [ -s data/dump.sql ]; then \
 		echo "Database exported via WP-CLI to data/dump.sql"; \
 	else \
 		echo "WP-CLI not available or failed, trying mysqldump..."; \
 		rm -f data/dump.sql; \
-		ssh $(SERVER) "cd $(WP_PATH) && \
+		ssh -p $(SSH_PORT) $(SERVER) "cd $(WP_PATH) && \
 			DB_NAME=\$$(awk -F\\' '/define.*DB_NAME/{print \$$4}' wp-config.php) && \
 			DB_USER=\$$(awk -F\\' '/define.*DB_USER/{print \$$4}' wp-config.php) && \
 			DB_PASS=\$$(awk -F\\' '/define.*DB_PASSWORD/{print \$$4}' wp-config.php) && \
