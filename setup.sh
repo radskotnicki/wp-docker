@@ -62,7 +62,9 @@ confirm() {
     echo -ne "  ${BOLD}?${RESET} ${prompt} ${DIM}[${hint}]${RESET}: " >&2
     read -r value
     value="${value:-$default}"
-    [[ "${value,,}" == "y" || "${value,,}" == "yes" ]]
+    local lower
+    lower=$(echo "$value" | tr '[:upper:]' '[:lower:]')
+    [[ "$lower" == "y" || "$lower" == "yes" ]]
 }
 
 generate_password() {
