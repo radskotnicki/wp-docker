@@ -22,8 +22,8 @@ ENV COMPOSER_ALLOW_SUPERUSER=1
 
 # Install WP-CLI with checksum verification
 RUN curl -fsSL -o /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-    && curl -fsSL -o /tmp/wp-cli.phar.sha512 https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha512 \
-    && cd /tmp && sha512sum --check wp-cli.phar.sha512 \
+    && EXPECTED=$(curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha512 | awk '{print $1}') \
+    && ACTUAL=$(sha512sum /tmp/wp-cli.phar | awk '{print $1}') \
+    && [ "$EXPECTED" = "$ACTUAL" ] \
     && mv /tmp/wp-cli.phar /usr/local/bin/wp \
-    && chmod +x /usr/local/bin/wp \
-    && rm /tmp/wp-cli.phar.sha512
+    && chmod +x /usr/local/bin/wp
