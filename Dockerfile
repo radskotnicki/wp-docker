@@ -21,7 +21,9 @@ COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 ENV COMPOSER_ALLOW_SUPERUSER=1
 
 # Install WP-CLI with checksum verification
-RUN curl -fsSL -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
-    && curl -fsSL https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha512 \
-       | sha512sum --check \
-    && chmod +x /usr/local/bin/wp
+RUN curl -fsSL -o /tmp/wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar \
+    && curl -fsSL -o /tmp/wp-cli.phar.sha512 https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar.sha512 \
+    && cd /tmp && sha512sum --check wp-cli.phar.sha512 \
+    && mv /tmp/wp-cli.phar /usr/local/bin/wp \
+    && chmod +x /usr/local/bin/wp \
+    && rm /tmp/wp-cli.phar.sha512
