@@ -35,7 +35,7 @@ Three workflows supported:
 ## Quick start
 
 ```bash
-git clone https://github.com/your-username/wp-docker.git
+git clone https://github.com/radskotnicki/wp-docker.git
 cd wp-docker
 make setup
 ```
